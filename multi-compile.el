@@ -259,7 +259,7 @@
   (let* ((template (multi-compile--get-command-template))
          (command (or (car-safe template) template))
          (default-directory (if (listp template) (eval-expression (cadr template)) default-directory)))
-    (compilation-start
+    (compile
      (multi-compile--fill-template command))))
 
 (multi-compile--load-hostory)
