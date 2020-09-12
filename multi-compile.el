@@ -139,6 +139,7 @@
   "The completion system to be used by multi-compile."
   :type '(radio
           (const :tag "Ido" ido)
+          (const :tag "Ivy" ivy)
           (const :tag "Helm" helm)
           (const :tag "Default" default)
           (function :tag "Custom function"))
@@ -228,6 +229,12 @@
            (ido-completing-read prompt choices))
           ((eq multi-compile-completion-system 'default)
            (completing-read prompt choices))
+          ((eq multi-compile-completion-system 'ivy)
+           (if (fboundp 'ivy-read)
+               (ivy-read prompt choices
+                         :preselect (ivy-thing-at-point)
+                         )
+             (user-error "Please install ivy")))
           ((eq multi-compile-completion-system 'helm)
            (if (fboundp 'helm-comp-read)
                (helm-comp-read prompt choices
