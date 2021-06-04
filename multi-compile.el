@@ -183,16 +183,103 @@
           (insert-file-contents multi-compile-history-file)
           (setq multi-compile-history (read (buffer-string)))))))
 
+(defun multi-compile--choose (prompt choices)
+  "Ask user to select one of the CHOICES using PROMPT."
+  (cond
+   ((eq multi-compile-completion-system 'ido)
+    (ido-completing-read prompt choices))
+   ((eq multi-compile-completion-system 'default)
+    (completing-read prompt choices))
+   ((eq multi-compile-completion-system 'ivy)
+    (if (fboundp 'ivy-read)
+        (ivy-read prompt choices
+                  :preselect (ivy-thing-at-point)
+                  )
+      (user-error "Please install ivy")))
+   ((eq multi-compile-completion-system 'helm)
+    (if (fboundp 'helm-comp-read)
+        (helm-comp-read prompt choices
+                        :candidates-in-buffer t
+                        :must-match 'confirm)
+      (user-error "Please install helm from https://github.com/emacs-helm/helm")))
+   (t (funcall multi-compile-completion-system prompt choices))))
+
 (defun multi-compile--fill-template (format-string)
   "Apply multi-compile-template to FORMAT-STRING."
   (dolist (template multi-compile-template)
-    (while (string-match (car template) format-string)
-      (let ((new-text (save-match-data (eval (cdr template)))))
-        (setq format-string
-              (replace-match
-               (if new-text new-text
-                 (concat "not-found-" (substring (car template) 1)))
-               t nil format-string)))))
+    (let* ((variable (car template))
+           (action (cdr template))
+           (action-type
+            (cond
+             ((stringp action) 'string-prompt)
+             ((stringp (car-safe action)) 'choice-prompt)
+             ((functionp action) 'function)
+             (t 'expression)))
+           (expanded)
+           (new-text))
+      (unless (eq action-type 'function)
+        (while (string-match variable format-string)
+          ;; Only perform the variable expansion once for user prompts
+          ;; and then replace subsequent occurrences with the expansion.
+          ;; This avoids prompting the user multiple times for the same
+          ;; data if the expansion variable exists multiple times in the
+          ;; format string.
+          ;;
+          ;; Expressions are expanded each time they are encountered since
+          ;; it is possible that the evaluation of expressions could have
+          ;; side-effects which could effect the result (such as the use
+          ;; of `random').
+          (when (or (not expanded)
+                    (eq action-type 'expression))
+            (setq expanded t)
+            (setq new-text
+                  (save-match-data
+                    (pcase action-type
+                      ('string-prompt (read-string action))
+                      ('choice-prompt (multi-compile--choose (car action) (cdr action)))
+                      ('expression    (eval action))))))
+          (setq format-string
+                (replace-match
+                 (if new-text new-text
+                   (concat "not-found-" (substring variable 1)))
+                 t nil format-string))))))
+
+  ;; Perform all of the function expansions after all other variable type expansions have
+  ;; occurred. This is done separately since functions can be nested and thus we may need to
+  ;; repeatedly expand functions from the innermost to the outermost.  The expectation
+  ;; is that the regex for the sub-expressions of an outer function will be defined in such
+  ;; a way as to prevent matching when an unexpanded function exists within that outer function
+  ;; (e.g., if brackets are used to delimit function parameters, don't allow a bracket in a
+  ;; sub-expression).
+  ;;
+  ;; We keep repeating the loop looking for additional functions which match, so that after
+  ;; an inner function has been expanded, the outer function would subsequently match in the
+  ;; next iteration of the loop and then be expanded.  We keep repeating this as long as at
+  ;; least one expansion occurs in a loop iteration.
+  (cl-loop
+   with function-expanded
+   do
+   (setq function-expanded nil)
+   (dolist (template multi-compile-template)
+     (let* ((variable (car template))
+            (action (cdr template))
+            (new-text))
+       (when (functionp action)
+         (while (string-match variable format-string)
+           (setq function-expanded t)
+           (setq new-text
+                 (save-match-data
+                   (let ((subexpression-count (- (/ (length (match-data)) 2) 1)))
+                     (apply action
+                            (cl-loop
+                             for i from 1 to subexpression-count
+                             collect (match-string-no-properties i format-string))))))
+           ;; Make sure applied function returned a string for insertion
+           (unless (stringp new-text)
+             (user-error "Applied function did not return a string"))
+           (setq format-string (replace-match new-text t nil format-string))))))
+   until (not function-expanded))
+
   format-string)
 
 (defun multi-compile--check-mode (mode-pattern filename)
@@ -225,25 +312,7 @@
            (choices (-union (-intersection multi-compile-history keys) keys)))
       (cdr
        (assoc
-        (multi-compile--add-to-history
-         (cond
-          ((eq multi-compile-completion-system 'ido)
-           (ido-completing-read prompt choices))
-          ((eq multi-compile-completion-system 'default)
-           (completing-read prompt choices))
-          ((eq multi-compile-completion-system 'ivy)
-           (if (fboundp 'ivy-read)
-               (ivy-read prompt choices
-                         :preselect (ivy-thing-at-point)
-                         )
-             (user-error "Please install ivy")))
-          ((eq multi-compile-completion-system 'helm)
-           (if (fboundp 'helm-comp-read)
-               (helm-comp-read prompt choices
-                               :candidates-in-buffer t
-                               :must-match 'confirm)
-             (user-error "Please install helm from https://github.com/emacs-helm/helm")))
-          (t (funcall multi-compile-completion-system prompt choices))))
+        (multi-compile--add-to-history (multi-compile--choose prompt choices))
         compile-list)))))
 
 (defun multi-compile--get-command-template ()
