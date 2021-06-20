@@ -336,9 +336,15 @@
   (interactive)
   (let* ((template (multi-compile--get-command-template))
          (command (or (car-safe template) template))
-         (default-directory (if (listp template) (eval-expression (cadr template)) default-directory)))
+         ;; The command may be either a string or a list of strings to be joined by a space.
+         ;; The canonical form is just a string where any joining has already been performed.
+         (canonical-command (string-join (flatten-list (list command)) " "))
+         (default-directory (if (and (listp template)
+                                     (> (length template) 1))
+                                (eval-expression (cadr template))
+                              default-directory)))
     (compile
-     (multi-compile--fill-template command))))
+     (multi-compile--fill-template canonical-command))))
 
 (multi-compile--load-hostory)
 

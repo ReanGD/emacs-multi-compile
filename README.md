@@ -28,6 +28,31 @@ Or drop `multi-compile.el` and [`dash.el`](https://github.com/magnars/dash.el) i
     ))
 ```
 
+In addition to the common string command, there is also an extended syntax that can be used for long or complicated commands.
+If the command consists of a list, the elements of the list are expected to be strings and will be joined with a space.
+This is a convenience syntax that may be desirable to avoid extremely long command strings.
+For instance, if the command consists of long paths or many options, it may be desirable that each path or option exist on its own line.
+This extended command syntax is supported both with and without the optional compilation directory expression.
+
+```lisp
+(setq multi-compile-alist '(
+    (Trigger1 . (("menu item 1" . "command 1")
+                 ("menu item 2" ("application 2"
+                                 "option 1"
+                                 "option 2"
+                                 ...))
+                 ("menu item 3" . "command 3")))
+
+    (Trigger2 . (("menu item 4" "command 4" (expression returns a directory for the compilation))
+                 ("menu item 5" ("application 5"
+                                 "option 1"
+                                 "option 2"
+                                 ...)
+                                (expression returns a directory for the compilation))))
+...
+    ))
+```
+
 ### Triggers:
 
 - Can be major-mode:
