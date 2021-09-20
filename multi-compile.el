@@ -124,6 +124,11 @@
                            ))))
   :group 'multi-compile)
 
+(defcustom multi-compile-default-directory-function #'ignore
+  "A function whose result can set the default-directory for a compile target."
+  :type 'function
+  :group 'multi-compile)
+
 (defcustom multi-compile-template
   '(
     ("%path" . (buffer-file-name))
@@ -339,10 +344,12 @@
          ;; The command may be either a string or a list of strings to be joined by a space.
          ;; The canonical form is just a string where any joining has already been performed.
          (canonical-command (string-join (flatten-list (list command)) " "))
-         (default-directory (if (and (listp template)
-                                     (> (length template) 1))
-                                (eval-expression (cadr template))
-                              default-directory)))
+         (default-directory (or (and (listp template)
+                                     (> (length template) 1)
+                                     (eval-expression (cadr template)))
+                                (and multi-compile-default-directory-function
+                                     (funcall multi-compile-default-directory-function))
+                                default-directory)))
     (compile
      (multi-compile--fill-template canonical-command))))
 
