@@ -71,6 +71,8 @@
 ;;     ("\\.*" . (("any-file-command" . "echo %file-name")))))
 ;;
 ;; You can use different backends for the menu:
+;; (setq multi-compile-completion-system 'auto)
+;; or
 ;; (setq multi-compile-completion-system 'ido)
 ;; or
 ;; (setq multi-compile-completion-system 'helm)
@@ -142,9 +144,10 @@
   :type '(alist :key-type string :value-type sexp)
   :group 'multi-compile)
 
-(defcustom multi-compile-completion-system 'ido
+(defcustom multi-compile-completion-system 'auto
   "The completion system to be used by multi-compile."
   :type '(radio
+          (const :tag "Auto-detect" auto)
           (const :tag "Ido" ido)
           (const :tag "Ivy" ivy)
           (const :tag "Helm" helm)
@@ -190,24 +193,26 @@
 
 (defun multi-compile--choose (prompt choices)
   "Ask user to select one of the CHOICES using PROMPT."
-  (cond
-   ((eq multi-compile-completion-system 'ido)
-    (ido-completing-read prompt choices))
-   ((eq multi-compile-completion-system 'default)
-    (completing-read prompt choices))
-   ((eq multi-compile-completion-system 'ivy)
-    (if (fboundp 'ivy-read)
-        (ivy-read prompt choices
-                  :preselect (ivy-thing-at-point)
-                  )
-      (user-error "Please install ivy")))
-   ((eq multi-compile-completion-system 'helm)
-    (if (fboundp 'helm-comp-read)
-        (helm-comp-read prompt choices
-                        :candidates-in-buffer t
-                        :must-match 'confirm)
-      (user-error "Please install helm from https://github.com/emacs-helm/helm")))
-   (t (funcall multi-compile-completion-system prompt choices))))
+  (pcase (if (eq multi-compile-completion-system 'auto)
+             (cond
+              ((bound-and-true-p ido-mode)  'ido)
+              ((bound-and-true-p ivy-mode)  'ivy)
+              ((bound-and-true-p helm-mode) 'helm)
+              (t 'default))
+           multi-compile-completion-system)
+    ('ido (ido-completing-read prompt choices))
+    ('ivy (if (and (fboundp 'ivy-read)
+                   (fboundp 'ivy-thing-at-point))
+              (ivy-read prompt choices
+                        :preselect (ivy-thing-at-point))
+            (user-error "Please install ivy")))
+    ('helm (if (fboundp 'helm-comp-read)
+               (helm-comp-read prompt choices
+                               :candidates-in-buffer t
+                               :must-match 'confirm)
+             (user-error "Please install helm")))
+    ('default (completing-read prompt choices))
+    (_ (funcall multi-compile-completion-system prompt choices))))
 
 (defun multi-compile--fill-template (format-string)
   "Apply multi-compile-template to FORMAT-STRING."
