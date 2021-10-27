@@ -8,7 +8,7 @@
 ;; Package-Version: 20160215.1219
 ;; Keywords: tools compile build
 ;; URL: https://github.com/ReanGD/emacs-multi-compile
-;; Package-Requires: ((emacs "24") (dash "2.12.1"))
+;; Package-Requires: ((emacs "24.4") (dash "2.12.1"))
 ;;
 ;; This file is not part of GNU Emacs.
 ;;
@@ -90,6 +90,10 @@
 ;;; Code:
 (require 'dash)
 (require 'compile)
+
+(eval-when-compile
+  ;; string-join
+  (require 'subr-x))
 
 (defgroup multi-compile nil
   "Multi target interface to `compile'."
@@ -343,7 +347,7 @@
          (command (or (car-safe template) template))
          ;; The command may be either a string or a list of strings to be joined by a space.
          ;; The canonical form is just a string where any joining has already been performed.
-         (canonical-command (string-join (flatten-list (list command)) " "))
+         (canonical-command (string-join (-flatten command) " "))
          (default-directory (or (and (listp template)
                                      (> (length template) 1)
                                      (eval-expression (cadr template)))
