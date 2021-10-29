@@ -271,7 +271,7 @@
   ;; next iteration of the loop and then be expanded.  We keep repeating this as long as at
   ;; least one expansion occurs in a loop iteration.
   (cl-loop
-   with function-expanded
+   with function-expanded = nil
    do
    (setq function-expanded nil)
    (dolist (template multi-compile-template)
