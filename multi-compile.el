@@ -94,6 +94,8 @@
 (require 'compile)
 
 (eval-when-compile
+  ;; cl-loop
+  (require 'cl-lib)
   ;; string-join
   (require 'subr-x))
 
