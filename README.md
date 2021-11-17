@@ -1,3 +1,5 @@
+[![MELPA](https://melpa.org/packages/multi-compile-badge.svg)](https://melpa.org/#/multi-compile)
+
 # multi-compile
 Multi target interface to compile.
 
